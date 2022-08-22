@@ -1,14 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'
-import * as dat from 'dat.gui';
 
-// 目标： 灯光与阴影
-// 首先材质要选对，要能对光照有反应
-// 设置渲染器开启阴影计算： render.shadowMap.enabled = true;
-// 设置光照投影映射： directionalLight.castShadow = true;
-// 设置物体投射阴影： sphere.castShadow = true;
-// 设置物体接收阴影： plane.castShadow = true;
+// 目标： cube纹理加载器
+// 用到： envMap 环境贴图
+// SphereGeometry 球形几何体
+// scene.background 场景的背景贴图
 // scene.environment 场景的物体的背景映射
 
 const scene = new THREE.Scene();
@@ -23,6 +19,7 @@ camera.position.set(0,0,10);
 scene.add(camera);
 
 // 导入纹理加载器
+// 这里是xyz三个轴，p是正向，n是负向，所以就是6张图6个方向，合成到全景的样子
 const cubeTextureLoader = new THREE.CubeTextureLoader();
 const envMapTexture = cubeTextureLoader.load([
   'textures/environmentMaps/1/px.jpg',
@@ -36,24 +33,46 @@ const envMapTexture = cubeTextureLoader.load([
 const sphereGeometry = new THREE.SphereGeometry(1, 20, 20);
 const material = new THREE.MeshStandardMaterial(
   {
-    // metalness: 0.8,
-    // roughness: 0.1,
+    metalness: 0.7,
+    roughness: 0.1,
     // envMap: envMapTexture,
   }
 );
 const sphere = new THREE.Mesh(sphereGeometry, material);
-// 投射阴影
-sphere.castShadow = true;
 scene.add(sphere);
+// 添加环境贴图
+scene.background = envMapTexture; // 给场景添加背景
+scene.environment = envMapTexture;  // 给场景的物体添加默认环境贴图，和上面的envMap一个效果
 
-// 创建平面
-const planeGeometry = new THREE.PlaneBufferGeometry(10, 10);
-const plane = new THREE.Mesh(planeGeometry, material);
-plane.position.set(0, -1, 0);
-plane.rotation.x = -Math.PI / 2;
-// 接收阴影
-plane.receiveShadow = true;
-scene.add(plane);
+var div = document.createElement("div");
+div.style.width = '200px';
+div.style.height = '200px';
+div.style.position = 'fixed';
+div.style.right = '0px';
+div.style.top = '0px';
+div.style.color = '#fff';
+document.body.appendChild(div);
+
+// 单张纹理图加载情况(不常用)
+let event = {};
+event.onLoad = function() {
+  console.log('pic loading finish');
+}
+event.onProgress = function(url, num, total) {
+  let persent = ((num / total) * 100).toFixed(2) + '%';
+  console.log('pic loading ...', persent);
+  div.innerHTML = persent;
+}
+event.onError = function(url, num, total) {
+  console.log('pic error! ', url, num, total);
+}
+
+// 设置加载管理器
+const loadingManager = new THREE.LoadingManager(
+  event.onLoad,
+  event.onProgress,
+  event.onError
+);
 
 // 追加灯光
 // 环境光
@@ -61,43 +80,14 @@ const light = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(light);
 // 平行光
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-directionalLight.position.set(5, 5, 5);
-directionalLight.castShadow = true;
-// 设置阴影模糊度
-directionalLight.shadow.radius = 20;
-// 设置阴影贴图分辨率
-directionalLight.shadow.mapSize.set(2048, 2048);
-console.log(directionalLight.shadow);
-
-// 设置平行光投射相机属性
-directionalLight.shadow.camera.near = 0.5;
-directionalLight.shadow.camera.far = 500;
-directionalLight.shadow.camera.top = 5;
-directionalLight.shadow.camera.bottom = -5;
-directionalLight.shadow.camera.left = -5;
-directionalLight.shadow.camera.right = 5;
-
+directionalLight.position.set(10, 10, 10);
 scene.add(directionalLight);
-
-// 配置gui helper
-const gui = new dat.GUI();
-gui.add(directionalLight.shadow.camera, 'near')
-   .min(0)
-   .max(10)
-   .step(0.1)
-   .onChange((val) => {
-    // 更新摄像机的投影矩阵
-      directionalLight.shadow.camera.updateProjectionMatrix();
-    }
-);
 
 // 初始化渲染器
 const render = new THREE.WebGLRenderer();
 render.setSize(window.innerWidth, window.innerHeight);
 // 将webgl渲染的canvas添加到body上
 document.body.appendChild(render.domElement);
-// 开启阴影渲染
-render.shadowMap.enabled = true;
 
 // 创建轨道控制器
 const controls = new OrbitControls(camera, render.domElement);
