@@ -3,11 +3,13 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'
 import * as dat from 'dat.gui';
 
-// 目标： 聚光灯与阴影
+// 目标： 灯光与阴影
 // 首先材质要选对，要能对光照有反应
-// 设置渲染器开启真实阴影计算： render.physicallyCorrectLights = true;
-// distance penumbra decay 衰减距离，有三种
-// angle 聚光灯角度
+// 设置渲染器开启阴影计算： render.shadowMap.enabled = true;
+// 设置光照投影映射： directionalLight.castShadow = true;
+// 设置物体投射阴影： sphere.castShadow = true;
+// 设置物体接收阴影： plane.castShadow = true;
+// scene.environment 场景的物体的背景映射
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
@@ -45,7 +47,7 @@ sphere.castShadow = true;
 scene.add(sphere);
 
 // 创建平面
-const planeGeometry = new THREE.PlaneBufferGeometry(50, 50);
+const planeGeometry = new THREE.PlaneBufferGeometry(10, 10);
 const plane = new THREE.Mesh(planeGeometry, material);
 plane.position.set(0, -1, 0);
 plane.rotation.x = -Math.PI / 2;
@@ -58,33 +60,36 @@ scene.add(plane);
 const light = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(light);
 // 平行光
-const spotLight = new THREE.SpotLight(0xffffff, 1);
-spotLight.position.set(5, 5, 5);
-spotLight.castShadow = true;
-spotLight.intensity = 2;
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(5, 5, 5);
+directionalLight.castShadow = true;
 // 设置阴影模糊度
-spotLight.shadow.radius = 20;
+directionalLight.shadow.radius = 20;
 // 设置阴影贴图分辨率
-spotLight.shadow.mapSize.set(2048, 2048);
-console.log(spotLight.shadow);
+directionalLight.shadow.mapSize.set(2048, 2048);
+console.log(directionalLight.shadow);
 
-// 设置透视相机属性
-spotLight.target = sphere;
-spotLight.angle = Math.PI / 6;
-spotLight.distance = 0; // 衰减距离
-spotLight.penumbra = 0; // 半衰减距离
-spotLight.decay = 0; // 沿光照距离衰减
+// 设置平行光投射相机属性
+directionalLight.shadow.camera.near = 0.5;
+directionalLight.shadow.camera.far = 500;
+directionalLight.shadow.camera.top = 5;
+directionalLight.shadow.camera.bottom = -5;
+directionalLight.shadow.camera.left = -5;
+directionalLight.shadow.camera.right = 5;
 
-scene.add(spotLight);
+scene.add(directionalLight);
 
 // 配置gui helper
 const gui = new dat.GUI();
-gui.add(sphere.position, 'x').min(-5).max(5).step(0.1);
-gui.add(spotLight, 'angle').min(0).max(Math.PI / 2).step(0.01);
-gui.add(spotLight, 'distance').min(0).max(10).step(0.01);
-gui.add(spotLight, 'penumbra').min(0).max(1).step(0.01);
-gui.add(spotLight, 'decay').min(0).max(5).step(0.01);
-
+gui.add(directionalLight.shadow.camera, 'near')
+   .min(0)
+   .max(10)
+   .step(0.1)
+   .onChange((val) => {
+    // 更新摄像机的投影矩阵
+      directionalLight.shadow.camera.updateProjectionMatrix();
+    }
+);
 
 // 初始化渲染器
 const render = new THREE.WebGLRenderer();
@@ -93,7 +98,6 @@ render.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(render.domElement);
 // 开启阴影渲染
 render.shadowMap.enabled = true;
-render.physicallyCorrectLights = true;
 
 // 创建轨道控制器
 const controls = new OrbitControls(camera, render.domElement);
